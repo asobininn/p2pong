@@ -5,6 +5,7 @@ use std::hash::Hash;
 
 const PADDLE_SPEED: f32 = 4.;
 const BALL_SPEED: f32 = 6.;
+const HORIZONTAL_WALL_WIDTH: f32 = 10.;
 const INPUT_UP: u8 = 1 << 0;
 const INPUT_DOWN: u8 = 1 << 1;
 pub const LEFT_PADDLE: f32 = 1.;
@@ -46,6 +47,11 @@ pub struct Scoreboard {
 }
 
 pub struct LastWinner(pub f32);
+
+pub struct WinSize {
+	pub w: f32,
+	pub h: f32,
+}
 // endregion: resource
 
 
@@ -56,10 +62,6 @@ pub fn setup_system(
 	windows: Res<Windows>,
 	asset_server: Res<AssetServer>,
 ) {
-	struct WinSize {
-		w: f32,
-		h: f32,
-	}
 	let window = windows.get_primary().unwrap();
 	let win_size = WinSize {
 		w: window.width(),
@@ -76,7 +78,7 @@ pub fn setup_system(
 			.spawn_bundle(SpriteBundle {
 				transform: Transform {
 					translation: Vec3::new(0., y, 0.),
-					scale: Vec3::new(win_size.w, 10., 0.),
+					scale: Vec3::new(win_size.w, HORIZONTAL_WALL_WIDTH, 0.),
 					..Default::default()
 				},
 				sprite: Sprite {
@@ -189,7 +191,7 @@ pub fn setup_system(
 
 	// resoureces
 	commands.insert_resource(Scoreboard{ left: 0, right: 0});
-	//commands.insert_resource()
+	commands.insert_resource(win_size);
 }
 
 pub fn spawn_ball_system(
@@ -222,6 +224,7 @@ pub fn spawn_ball_system(
 
 pub fn move_paddle_system(
 	mut query: Query<(&mut Transform, &Paddle), With<Rollback>>,
+	win_size: Res<WinSize>,
 	inputs: Res<Vec<GameInput>>,
 ) {
 	for(mut ts, paddle) in query.iter_mut() {
@@ -231,8 +234,13 @@ pub fn move_paddle_system(
 			INPUT_DOWN => -1.,
 			_ => 0.,
 		};
+		let paddle_y_length: f32 = ts.scale.y.clone();
 		let translation = &mut ts.translation;
+		let bound = win_size.h / 2. - paddle_y_length / 2. - HORIZONTAL_WALL_WIDTH / 2.;
 		translation.y += direction * PADDLE_SPEED;
+		translation.y = translation.y
+			.min(bound)
+			.max(-bound);
 	}
 }
 
